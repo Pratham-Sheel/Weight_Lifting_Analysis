@@ -1,0 +1,147 @@
+---
+title: "Weight Lifting Movement Analysis"
+author: "Pratham Sheel"
+date: "5/16/2022"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+First we will load the required libraries for our analysis:-
+
+```{r}
+library(caret)
+library(rpart)
+library(class)
+```
+
+Now,we will load our training and testing datasets.
+
+```{r}
+training<-read.csv("H:/Course Data/coursera/Course 8/pml-training.csv")
+
+testing<-read.csv("H:/Course Data/coursera/Course 8/pml-testing.csv")
+
+```
+
+To eliminate the variables which are meaningless in our dataset.
+for the elimination of variables we will use the Near Zero Variance function.
+It will give us a dataframe of all variables with their frequency ratio, percentage of unique values.
+Lets see the first 10 observations of Near Zero Variance DF:-
+
+```{r}
+NZV <- nearZeroVar(training, saveMetrics = TRUE)
+head(NZV,10)
+
+```
+
+Now, we will remove the columns which has near zero variance or meaningless and save it in a new data frame called train01.
+
+```{r}
+train01<-training[,!NZV$nzv]
+test01<-testing[,!NZV$nzv]
+
+```
+
+Removing some of the columns which are not much relevant for the data modeling. These columns are the X variable, user_name, timestamp variables and new_window variable.
+
+```{r}
+train02<-train01[,-c(1:5)]
+test02<-test01[,-c(1:5)]
+
+```
+
+
+Remove all the remaining columns that contain "NA's"
+
+```{r}
+cond <- (colSums(is.na(train02)) == 0)
+train03 <- train02[, cond]
+test03 <- test02[, cond]
+test03<-test03[,-54]
+
+```
+
+The dimensions of our processed dataframe are `r dim(train03)`.
+
+
+Removing all the objects which are not required.
+
+```{r}
+rm(train01)
+rm(train02)
+rm(test01)
+rm(test02)
+rm(training)
+rm(testing)
+
+```
+
+
+Now we will create validation set to check the accuracy of our model.
+
+```{r}
+set.seed(12345)
+inTrain <- createDataPartition(train03$classe, p = 0.70, list = FALSE)
+validation <- train03[-inTrain, ]
+train03 <- train03[inTrain, ]
+```
+
+
+Now we will use Machine Learning model for prediction.
+We will use two models for predictions. Then we will select one model which will give better accuracy.
+
+First we will use KNN (K Nearest Neighbor) Model with 140 as K value because square root of total observations which is 19622 is approx 140.08.
+
+```{r}
+model1<-train(classe~.,data=train03,method="knn")
+model1
+```
+
+```{r}
+pred1<-predict(model1,validation)
+acc1=mean(pred1==validation$classe)
+```
+So, the accuracy of our KNN model on validation set is `r acc1*100`%
+
+
+The second Machine Learning Model is Random Forest algorithm because it automatically selects important variables and is robust to correlated covariates & outliers in general.  
+We will use 5-fold cross validation when applying the algorithm.
+
+```{r}
+model2 <- train(classe ~ ., data = train03, method = "rf", trControl = trainControl(method = "cv", 5), ntree = 250)
+model2
+```
+
+
+```{r}
+pred2<-predict(model2,validation)
+acc2=mean(pred2==validation$classe)
+```
+So, the accuracy of our Random Forest model on validation set is `r acc2*100`%
+
+So, as Random forest is giving better accuracy than KNN.
+We will use Random Forest Model for predictions.
+
+```{r}
+predict(model2,test03)
+```
+
+Function to generate files with predictions to submit for assignment:-
+```{r}
+pml_write_files = function(x){
+n = length(x)
+  for(i in 1:n){
+    filename = paste0("C:/Users/user/R_codes/Course8/Assignment_Solutions/problem_id_",i,".txt")
+    write.table(x[i], file = filename, quote = FALSE, row.names = FALSE, col.names = FALSE)
+  }
+}
+```
+
+
+For Generating files:-
+
+```{r}
+pml_write_files(predict(model2,test03))
+```
+
